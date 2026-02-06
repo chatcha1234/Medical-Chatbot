@@ -2,8 +2,8 @@ from crewai.tools import BaseTool
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
-from pinecone import Pinecone, ServerlessSpec
+from langchain_community.vectorstores import Pinecone as LangchainPinecone
+from pinecone import Pinecone
 import os
 import time
 
@@ -27,7 +27,7 @@ class PDFSearchTool(BaseTool):
         if index_name not in existing_indexes:
             return "The medical database is not initialized. Please run ingestion."
 
-        vectorstore = PineconeVectorStore(index_name=index_name, embedding=embeddings)
+        vectorstore = LangchainPinecone.from_existing_index(index_name=index_name, embedding=embeddings)
         
         try:
             results = vectorstore.similarity_search(query, k=3)
