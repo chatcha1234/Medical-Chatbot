@@ -9,7 +9,8 @@ class MedicalAgents:
             model="gemini/gemini-1.5-flash",
             verbose=True,
             temperature=0.2,
-            api_key=os.getenv("GOOGLE_API_KEY")
+            api_key=os.getenv("GOOGLE_API_KEY"),
+            api_version="v1"
         )
         self.tools = MedicalTools()
 
