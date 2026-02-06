@@ -1,21 +1,22 @@
-from crewai import Agent, LLM
+from crewai import Agent
+from langchain_google_genai import ChatGoogleGenerativeAI
 from src.tools import MedicalTools
 from src.prompt import SYSTEM_DESCRIPTION
 import os
 
 class MedicalAgents:
     def __init__(self):
-        self.llm = LLM(
-            model="gemini/gemini-pro",
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
             verbose=True,
             temperature=0.2,
-            api_key=os.getenv("GOOGLE_API_KEY"),
-            safety_settings=[
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
-            ]
+            google_api_key=os.getenv("GOOGLE_API_KEY"),
+            safety_settings={
+                "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+                "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+                "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+                "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
+            }
         )
         self.tools = MedicalTools()
 
