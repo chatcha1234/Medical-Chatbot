@@ -24,6 +24,10 @@ def format_history(history):
         formatted += f"{role}: {content}\n"
     return formatted
 
+@app.route('/')
+def health_check():
+    return "Medical Chatbot API is running correctly!"
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     data = request.json
