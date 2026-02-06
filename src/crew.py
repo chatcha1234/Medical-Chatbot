@@ -7,30 +7,47 @@ def create_crew(inputs):
     agents = MedicalAgents()
     tasks = MedicalTasks()
 
-    # Instantiate Agents
-    researcher = agents.researcher()
-    analyst = agents.analyst()
+    # 1. Triage
+    triage_specialist = agents.triage_specialist()
+    t_task = tasks.triage_task(triage_specialist, inputs['topic'])
 
-    # Tasks
-    task1 = tasks.search_task(researcher, inputs['topic'], inputs.get('history', ""), inputs.get('user_profile', "{}"))
-    task2 = tasks.analysis_task(analyst, inputs['topic'], task1, inputs.get('user_profile', "{}"), inputs.get('history', ""))
+    # 2. Research
+    researcher = agents.medical_researcher()
+    r_task = tasks.research_task(researcher, inputs['topic'], t_task)
 
-    # Crew
+    # 3. Clinical Interaction
+    consultant = agents.clinical_consultant()
+    d_task = tasks.dialogue_task(
+        consultant, 
+        inputs['topic'], 
+        t_task, 
+        r_task, 
+        inputs.get('history', ""), 
+        inputs.get('user_profile', "{}")
+    )
+
+    # 4. Final Formatting
+    formatter = agents.format_specialist()
+    f_task = tasks.formatting_task(formatter, d_task)
+
+    # Crew Assembly
     crew = Crew(
-        agents=[researcher, analyst],
-        tasks=[task1, task2],
+        agents=[triage_specialist, researcher, consultant, formatter],
+        tasks=[t_task, r_task, d_task, f_task],
         verbose=True,
-        process=Process.sequential,
-        memory=False
+        process=Process.hierarchical,
+        manager_llm=agents.manager_llm,
+        memory=True,
+        embedder={
+            "provider": "google-generativeai",
+            "config": {
+                "model": "models/gemini-embedding-001",
+            }
+        }
     )
 
     return crew
 
 if __name__ == "__main__":
-    try:
-        my_crew = create_crew({'topic': 'test', 'history': '', 'user_profile': '{}'})
-        result = my_crew.kickoff()
-        print(f"Test Result: {result}")
-    except Exception as e:
-        print(f"Error: {e}")
-
+    test_crew = create_crew({'topic': 'ปวดหัวครับ', 'history': '', 'user_profile': '{}'})
+    test_crew.kickoff()
