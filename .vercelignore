@@ -1,0 +1,12 @@
+src/
+data/
+data_backup/
+requirements.txt
+runtime.txt
+app.py
+Procfile
+ingest.py
+check_models.py
+*.pdf
+venv/
+__pycache__/
