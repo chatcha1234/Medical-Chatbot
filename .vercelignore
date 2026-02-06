@@ -1,17 +1,18 @@
-# Ignore Backend files from Vercel
-app.py
-requirements.txt
-Procfile
-ingest.py
-check_models.py
-src/
-data/
-data_backup/
-venv/
-__pycache__/
-*.pdf
-research/
-.env
+# Ignore ONLY Root Backend files
+/app.py
+/requirements.txt
+/Procfile
+/ingest.py
+/check_models.py
+/runtime.txt
+/src/
+/data/
+/data_backup/
+/venv/
+/__pycache__/
+/*.pdf
+/research/
+/.env
 
-# Allow frontend/ but ignore its node_modules
+# Ignore frontend node_modules but KEEP frontend/src/
 frontend/node_modules/
