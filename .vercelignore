@@ -1,12 +1,17 @@
-src/
-data/
-data_backup/
-requirements.txt
-runtime.txt
+# Ignore Backend files from Vercel
 app.py
+requirements.txt
 Procfile
 ingest.py
 check_models.py
-*.pdf
+src/
+data/
+data_backup/
 venv/
 __pycache__/
+*.pdf
+research/
+.env
+
+# Allow frontend/ but ignore its node_modules
+frontend/node_modules/
