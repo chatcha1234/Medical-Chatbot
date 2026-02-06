@@ -210,3 +210,7 @@ __marimo__/
 data_backup/
 *.backup
 
+
+# Medical Data
+data/
+
