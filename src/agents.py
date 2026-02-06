@@ -6,11 +6,10 @@ import os
 class MedicalAgents:
     def __init__(self):
         self.llm = LLM(
-            model="gemini/gemini-1.5-flash",
+            model="gemini/gemini-2.0-flash",
             verbose=True,
             temperature=0.2,
-            api_key=os.getenv("GOOGLE_API_KEY"),
-            api_version="v1"
+            api_key=os.getenv("GOOGLE_API_KEY")
         )
         self.tools = MedicalTools()
 
