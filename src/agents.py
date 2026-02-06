@@ -7,16 +7,10 @@ import os
 class MedicalAgents:
     def __init__(self):
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-pro",
             verbose=True,
             temperature=0.2,
-            google_api_key=os.getenv("GOOGLE_API_KEY"),
-            safety_settings={
-                "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-                "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-                "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-                "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
-            }
+            google_api_key=os.getenv("GOOGLE_API_KEY")
         )
         self.tools = MedicalTools()
 
