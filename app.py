@@ -1,31 +1,62 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
+from dotenv import load_dotenv
 from src.crew import create_crew
 import os
+import time
+
+load_dotenv()
+
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
+
+def format_history(history):
+    """Helper to format conversation history for the AI."""
+    if not isinstance(history, list):
+        return str(history)
+        
+    formatted = ""
+    for msg in history:
+        role = "คุณหมอ" if msg.get('role') == 'assistant' else "คนไข้"
+        # Avoid leaking internal thinking blocks into the AI context if possible
+        content = msg.get('content', '')
+        formatted += f"{role}: {content}\n"
+    return formatted
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
     data = request.json
     topic = data.get('topic')
+    history = data.get('history', [])
+    user_profile = data.get('user_profile', {})
     
     if not topic:
         return jsonify({"error": "No topic provided"}), 400
     
     try:
-        # Initialize the crew
-        # Note: In production, you might want to cache the crew agent or manage sessions
-        # For now, we create a fresh crew for each request to keep it stateless
-        crew = create_crew()
+        inputs = {
+            'topic': topic,
+            'history': format_history(history),
+            'user_profile': str(user_profile)
+        }
         
-        # Kickoff with inputs
-        result = crew.kickoff(inputs={'topic': topic})
-        
-        return jsonify({"result": str(result)})
+        crew = create_crew(inputs)
+        result = str(crew.kickoff(inputs=inputs))
+
+        def generate():
+            chunk_size = 5
+            for i in range(0, len(result), chunk_size):
+                yield f"data: {result[i:i+chunk_size]}\n\n"
+                time.sleep(0.01)
+            yield "data: [DONE]\n\n"
+
+        return Response(generate(), mimetype='text/event-stream')
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        app.logger.error(f"Chat error: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8080)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port, threaded=True, debug=False)

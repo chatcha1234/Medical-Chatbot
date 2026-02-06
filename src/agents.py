@@ -1,24 +1,37 @@
-from crewai import Agent
-from src.tools import PDFSearchTool
+from crewai import Agent, LLM
+from src.tools import MedicalTools
+from src.prompt import SYSTEM_DESCRIPTION
+import os
 
 class MedicalAgents:
+    def __init__(self):
+        self.llm = LLM(
+            model="gemini/gemini-2.0-flash",
+            verbose=True,
+            temperature=0.2,
+            api_key=os.getenv("GOOGLE_API_KEY")
+        )
+        self.tools = MedicalTools()
+
+
     def researcher(self):
         return Agent(
             role='Medical Researcher',
-            goal='Find precise information from medical documents.',
-            backstory="""You are an expert researcher. Your job is to dig through 
-            medical PDFs to find relevant clinical trials, treatments, and protocols.""",
+            goal='Find accurate medical information for queries, or identify general conversation.',
+            backstory='Assistant specialized in searching medical databases. You distinguish between medical questions and casual greetings.',
+            tools=[self.tools.medical_search],
+            llm=self.llm,
             verbose=True,
-            allow_delegation=False,
-            tools=[PDFSearchTool()]
+            allow_delegation=False
         )
 
     def analyst(self):
         return Agent(
             role='Medical Analyst',
-            goal='Analyze and synthesize medical research into clear answers.',
-            backstory="""You are a senior medical analyst. You take raw data from 
-            researchers and turn it into actionable, easy-to-understand advice.""",
+            goal='Analyze clinical data and provide structured consultation responses.',
+            backstory=SYSTEM_DESCRIPTION,
+            llm=self.llm,
             verbose=True,
             allow_delegation=False
         )
+

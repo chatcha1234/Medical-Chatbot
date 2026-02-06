@@ -2,48 +2,49 @@ from crewai.tools import BaseTool
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import FAISS
+from langchain_pinecone import PineconeVectorStore
+from pinecone import Pinecone, ServerlessSpec
 import os
+import time
 
 class PDFSearchTool(BaseTool):
-    name: str = "PDF Search Tool"
+    name: str = "Medical Search"
     description: str = (
-        "Useful for searching and extracting information from PDF documents. "
-        "Input should be a search query."
+        "Useful for searching and extracting information from the medical encyclopedia (PDFs). "
+        "Input should be a search query in English."
     )
     
     def _run(self, query: str) -> str:
-        # Check if data directory exists
-        data_path = os.path.join(os.getcwd(), "data")
-        if not os.path.exists(data_path):
-            return "Error: 'data' directory not found."
+        if not os.getenv("PINECONE_API_KEY"):
+            return "Error: PINECONE_API_KEY not found."
+        
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+        pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+        index_name = "medical-chatbot"
 
-        # Load PDFs
-        loader = DirectoryLoader(data_path, glob="*.pdf", loader_cls=PyPDFLoader)
-        documents = loader.load()
-        
-        if not documents:
-            return "No PDF documents found in 'data' directory."
+        # Check for index
+        existing_indexes = [index.name for index in pc.list_indexes()]
+        if index_name not in existing_indexes:
+            return "The medical database is not initialized. Please run ingestion."
 
-        # Split text
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        chunks = text_splitter.split_documents(documents)
+        vectorstore = PineconeVectorStore(index_name=index_name, embedding=embeddings)
+        
+        try:
+            results = vectorstore.similarity_search(query, k=3)
+            if not results:
+                return "No specific information found. Suggest general medical advice or see a doctor."
+            
+            formatted_results = []
+            for doc in results:
+                source = os.path.basename(doc.metadata.get('source', 'Unknown'))
+                page = doc.metadata.get('page', 'N/A')
+                content = doc.page_content.replace('\n', ' ')
+                formatted_results.append(f"[SOURCE: {source}, PAGE: {page}]\nCONTENT: {content}")
+            
+            return "\n\n---\n\n".join(formatted_results)
+        except Exception as e:
+            return f"Error during search: {str(e)}"
 
-        # Create Vector Store (Using FAISS if available, else standard list search - using FAISS here requires faiss-cpu)
-        # Since faiss-cpu is not explicitly in requirements, we'll try to import or handle error.
-        # For this example, we will assume user interprets "Search" as semantic search.
-        # If FAISS is missing, we might need to add it. For now, let's use a simple text search fallback?
-        # No, let's assume we can use a basic embedding or just return the top text chunks.
-        
-        # Simplified for now: just return first 2000 chars of relevant doc?
-        # Better: use a simple keyword search loop if vector store not ready.
-        
-        results = []
-        for doc in chunks:
-            if query.lower() in doc.page_content.lower():
-                results.append(doc.page_content)
-        
-        if not results:
-             return "No relevant information found in the documents."
-             
-        return "\n\n".join(results[:3]) # Return top 3 matches
+class MedicalTools:
+    def __init__(self):
+        self.medical_search = PDFSearchTool()

@@ -3,7 +3,7 @@ from src.agents import MedicalAgents
 from src.tasks import MedicalTasks
 import os
 
-def create_crew():
+def create_crew(inputs):
     agents = MedicalAgents()
     tasks = MedicalTasks()
 
@@ -11,36 +11,26 @@ def create_crew():
     researcher = agents.researcher()
     analyst = agents.analyst()
 
-    # Instantiate Tasks
-    # Note: In CrewAI, tasks are usually instantiated with the agents. 
-    # But for dynamic inputs like 'topic', we often define them in a way that can accept inputs.
-    # However, CrewAI kickof(inputs={...}) interpolates {variables} in descriptions.
-    
-    # Redefine tasks to be static but use interpolation
-    # Or keep it simple as before but organized.
-    
-    # Correct approach for interpolation with kickoff inputs:
-    # We create the task objects. The description string should have {topic} placeholders.
-    
-    task1 = tasks.search_task(researcher, "{topic}")
-    task2 = tasks.analysis_task(analyst, "{topic}", task1)
+    # Tasks
+    task1 = tasks.search_task(researcher, inputs['topic'], inputs.get('history', ""), inputs.get('user_profile', "{}"))
+    task2 = tasks.analysis_task(analyst, inputs['topic'], task1, inputs.get('user_profile', "{}"), inputs.get('history', ""))
 
     # Crew
     crew = Crew(
         agents=[researcher, analyst],
         tasks=[task1, task2],
         verbose=True,
-        process=Process.sequential
+        process=Process.sequential,
+        memory=False
     )
 
     return crew
 
 if __name__ == "__main__":
-    # Example usage
-    # os.environ["GOOGLE_API_KEY"] = "YOUR_API_KEY_HERE" 
     try:
-        my_crew = create_crew()
-        result = my_crew.kickoff(inputs={'topic': 'input your query here'})
-        print(result)
+        my_crew = create_crew({'topic': 'test', 'history': '', 'user_profile': '{}'})
+        result = my_crew.kickoff()
+        print(f"Test Result: {result}")
     except Exception as e:
         print(f"Error: {e}")
+
