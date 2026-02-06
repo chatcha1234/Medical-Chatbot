@@ -5,7 +5,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     
     // Proxy to Flask Backend with Streaming support
-    const response = await fetch('http://127.0.0.1:8080/api/chat', {
+    const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:8080';
+    const response = await fetch(`${backendUrl}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
