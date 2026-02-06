@@ -9,7 +9,13 @@ class MedicalAgents:
             model="gemini/gemini-2.0-flash",
             verbose=True,
             temperature=0.2,
-            api_key=os.getenv("GOOGLE_API_KEY")
+            api_key=os.getenv("GOOGLE_API_KEY"),
+            safety_settings={
+                "HARASSMENT": "BLOCK_NONE",
+                "HATE": "BLOCK_NONE",
+                "SEXUAL": "BLOCK_NONE",
+                "DANGEROUS": "BLOCK_NONE"
+            }
         )
         self.tools = MedicalTools()
 
