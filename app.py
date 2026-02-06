@@ -59,7 +59,8 @@ def chat():
 
     except Exception as e:
         app.logger.error(f"Chat error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        # FOR DEBUGGING ONLY: Return the actual error message
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
