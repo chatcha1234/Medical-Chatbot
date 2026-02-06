@@ -1,16 +1,15 @@
-from crewai import Agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+from crewai import Agent, LLM
 from src.tools import MedicalTools
 from src.prompt import SYSTEM_DESCRIPTION
 import os
 
 class MedicalAgents:
     def __init__(self):
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-pro",
+        self.llm = LLM(
+            model="gemini/gemini-1.5-flash",
             verbose=True,
             temperature=0.2,
-            google_api_key=os.getenv("GOOGLE_API_KEY")
+            api_key=os.getenv("GOOGLE_API_KEY")
         )
         self.tools = MedicalTools()
 
