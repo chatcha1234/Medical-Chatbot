@@ -214,3 +214,15 @@ data_backup/
 # Medical Data
 data/
 
+
+# Project Specific
+.env*
+*.backup
+data_backup/
+test_*
+debug_*
+research_report.txt
+.venv/
+node_modules/
+frontend/out/
+frontend/.next/
