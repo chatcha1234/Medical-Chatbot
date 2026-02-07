@@ -6,17 +6,17 @@ export const cleanMessage = (text: string): string => {
 
   let cleaned = text;
 
-  // 1. Remove "data:" prefixes
+  // 1. Remove "Final Answer:" noise if CrewAI adds it
+  cleaned = cleaned.replace(/^Final Answer:\s*/gi, "");
+
+  // 2. Remove "data:" prefixes
   cleaned = cleaned.replace(/^data:\s*/gm, "");
 
-  // 2. Remove internal THINKING blocks
+  // 3. Remove internal THINKING blocks
   cleaned = cleaned.replace(/\[\s*THINKING[\s\S]*?\]\]/gi, "");
   cleaned = cleaned.replace(/\[\s*THINKING[\s\S]*?\]/gi, "");
   
-  // 3. MORE PRECISE SUGGESTIONS CUT
-  // We only cut if we see a clear start of the suggestions block.
-  // The block starts with "[SUGGESTIONS" or just "SUGGESTIONS:"
-  
+  // 4. MORE PRECISE SUGGESTIONS CUT
   const tagStartRegex = /\[\s*SUGGESTIONS|(?:\n|^)SUGGESTIONS:/i;
   const match = cleaned.match(tagStartRegex);
 
@@ -25,36 +25,26 @@ export const cleanMessage = (text: string): string => {
       return cleaned.trim();
   }
 
-  // 4. HANDLING SPLIT TAGS CAREFULLY
-  // We look for patterns like "UGGESTIONS:", "GGESTIONS:", "GESTIONS:"
-  // This handles cases where the stream splits inside the word "SUGGESTIONS"
+  // 5. HANDLING SPLIT TAGS CAREFULLY
   const splitTagRegex = /(?:SU|UG|G)?GESTIONS\s*[:]/i;
   const suffixMatch = cleaned.match(splitTagRegex);
   
   if (suffixMatch && suffixMatch.index !== undefined) {
-      // Cut from the start of the match (which includes the prefix SU/UG/G if present)
       cleaned = cleaned.substring(0, suffixMatch.index);
   }
 
-  // 5. Remove MODE tag
+  // 6. Remove MODE tag
   cleaned = cleaned.replace(/\[\s*MODE:\s*(?:RAG|BRAIN)\s*\]/gi, "");
   
-  // 6. SAFER TAIL CLEANING
-  // Handle partial tags appearing at the end of the stream to avoid "flicker".
-  // Instead of a complex regex that crashes some browsers, we check endings manually.
-  
-  const possibleTags = [
-    "[",
-    "[S", "[SU", "[SUG", "[SUGG", "[SUGGE", "[SUGGES", "[SUGGEST", "[SUGGESTI", "[SUGGESTIO", "[SUGGESTION", "[SUGGESTIONS",
-    "[M", "[MO", "[MOD", "[MODE"
-  ];
-
-  for (const tag of possibleTags) {
-     // Case insensitive check at the very end of the string
-     if (cleaned.toUpperCase().endsWith(tag)) {
-         cleaned = cleaned.substring(0, cleaned.length - tag.length);
-         break; // Found and removed the longest match
-     }
+  // 7. SAFER TAIL CLEANING (Hide partial tags at the end of stream)
+  // If the message ends with an open bracket '[' or a partial tag, hide it.
+  const lastOpenBracket = cleaned.lastIndexOf('[');
+  if (lastOpenBracket !== -1 && lastOpenBracket > cleaned.length - 20) {
+      const tail = cleaned.substring(lastOpenBracket);
+      // If it looks like a tag start and hasn't been closed
+      if (/^\[\s*(?:T|TH|THI|THIN|THINK|THINKI|THINKIN|THINKING|S|SU|SUG|SUGG|SUGGE|SUGGES|SUGGEST|M|MO|MOD|MODE)/i.test(tail)) {
+          cleaned = cleaned.substring(0, lastOpenBracket);
+      }
   }
 
   return cleaned.trim();

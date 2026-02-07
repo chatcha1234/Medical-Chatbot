@@ -18,6 +18,12 @@ type UserProfile = {
   allergies: string;
 };
 
+type ThinkingLog = {
+  agent: string;
+  content: string;
+  time: string;
+};
+
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'สวัสดีครับ หมอพร้อมให้คำปรึกษาแล้วครับ', mode: 'BRAIN' }
@@ -25,6 +31,8 @@ export default function ChatInterface() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showLogs, setShowLogs] = useState(false);
+  const [thinkingLogs, setThinkingLogs] = useState<ThinkingLog[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>({
     age: '',
     gender: 'ไม่ระบุ',
@@ -47,6 +55,7 @@ export default function ChatInterface() {
 
     setSuggestions([]);
     setInput('');
+    setThinkingLogs([]);
     setMessages(prev => [...prev, { role: 'user', content: messageText }]);
     setIsLoading(true);
 
@@ -71,52 +80,68 @@ export default function ChatInterface() {
       let assistantMessage = '';
 
 
-
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
+      let buffer = '';
       while (true) {
         const { done, value } = await reader!.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        
+        // Keep the last part in the buffer if it's incomplete
+        buffer = parts.pop() || '';
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.replace('data: ', '');
-            console.log('📦 Chunk:', data); // Debug: Log raw chunk
+          for (const part of parts) {
+            if (!part.trim()) continue;
 
-            if (data === '[DONE]') {
+            const lines = part.split('\n');
+            const rawData = lines
+              .map(line => line.startsWith('data: ') ? line.slice(6) : line)
+              .join('\n');
+
+            if (rawData.includes('[DONE]')) {
               console.log('✅ Stream complete');
               const options = parseSuggestions(assistantMessage);
               const mode = parseMode(assistantMessage);
-              console.log('🏷️ Parsed Mode:', mode); // Debug: Log mode
-              console.log('💡 Parsed Suggestions:', options); // Debug: Log suggestions
               setSuggestions(options);
 
-
-              // CRITICAL: Final clean of the assistant message before finishing
               const finalMessage = cleanMessage(assistantMessage);
               setMessages(prev => {
                 const newMessages = [...prev];
                 const lastMsg = newMessages[newMessages.length - 1];
                 lastMsg.content = finalMessage;
-                if (mode) lastMsg.mode = mode; // Set mode if found
+                if (mode) lastMsg.mode = mode;
                 return newMessages;
               });
-              break;
+              return;
             }
 
-            assistantMessage += data;
-            const displayMessage = cleanMessage(assistantMessage);
-
-            setMessages(prev => {
-              const newMessages = [...prev];
-              newMessages[newMessages.length - 1].content = displayMessage;
-              return newMessages;
-            });
+            try {
+              const parsed = JSON.parse(rawData);
+              
+              if (parsed.type === 'thinking') {
+                console.log('💭 Thinking log received:', parsed);
+                setThinkingLogs(prev => [...prev, {
+                  agent: parsed.agent,
+                  content: parsed.content,
+                  time: new Date().toLocaleTimeString()
+                }]);
+              } else if (parsed.type === 'answer') {
+                assistantMessage += parsed.content;
+                const displayMessage = cleanMessage(assistantMessage);
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  if (newMessages.length > 0) {
+                    newMessages[newMessages.length - 1].content = displayMessage;
+                  }
+                  return newMessages;
+                });
+              }
+            } catch (e) {
+              console.log('Skip parse:', rawData);
+            }
           }
-        }
       }
     } catch (error) {
       console.error('Error:', error);
@@ -227,22 +252,35 @@ export default function ChatInterface() {
       <div className="absolute inset-0 z-0 bg-slate-50/80 backdrop-blur-md" />
 
       {/* Header */}
-      <header className="bg-white/70 backdrop-blur-md shadow-sm px-6 py-4 flex items-center gap-3 relative z-10 border-b border-white/50">
-        <div className="bg-blue-600 p-2 rounded-lg">
-            <Bot className="w-6 h-6 text-white" />
+      <header className="bg-white/70 backdrop-blur-md shadow-sm px-6 py-4 flex items-center justify-between relative z-10 border-b border-white/50">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600 p-2 rounded-lg">
+              <Bot className="w-6 h-6 text-white" />
+          </div>
+          <div>
+              <h1 className="text-xl font-bold text-gray-800">Medical AI Agent</h1>
+              <p className="text-xs text-gray-500 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  {userProfile.age && `พยาธิสภาพ: ${userProfile.gender} ${userProfile.age} ปี`}
+                  {userProfile.history && ` | ประวัติ: ${userProfile.history}`}
+              </p>
+          </div>
         </div>
-        <div>
-            <h1 className="text-xl font-bold text-gray-800">Medical AI Agent</h1>
-            <p className="text-xs text-gray-500 flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                {userProfile.age && `พยาธิสภาพ: ${userProfile.gender} ${userProfile.age} ปี`}
-                {userProfile.history && ` | ประวัติ: ${userProfile.history}`}
-            </p>
-        </div>
+        <button 
+          onClick={() => setShowLogs(!showLogs)}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+            showLogs ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`} />
+          {showLogs ? 'Hide Logs' : 'Show Thinking'}
+        </button>
       </header>
 
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10">
+      <div className="flex flex-1 overflow-hidden relative z-10">
+        {/* Chat Area */}
+        <div className={`flex-1 flex flex-col transition-all duration-500 ${showLogs ? 'mr-0' : ''}`}>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
           <div
             key={index}
@@ -296,7 +334,44 @@ export default function ChatInterface() {
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* Thinking Logs Sidebar */}
+        {showLogs && (
+          <div className="w-80 bg-white/40 backdrop-blur-2xl border-l border-white/50 flex flex-col animate-in slide-in-from-right duration-500 shadow-2xl">
+            <div className="p-4 border-b border-white/50 bg-white/20">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <Loader2 className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : 'text-gray-400'}`} />
+                AI Strategy Room
+              </h3>
+              <p className="text-[10px] text-gray-500">Live feed from the Clinical Quad Agents</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-[11px]">
+              {thinkingLogs.length === 0 && (
+                <div className="text-center py-10 text-gray-400 italic">
+                  Waiting for agent process...
+                </div>
+              )}
+              {thinkingLogs.map((log, idx) => (
+                <div key={idx} className="bg-white/60 p-3 rounded-xl border border-white/50 shadow-sm animate-in fade-in slide-in-from-top-1">
+                  <div className="flex justify-between mb-1">
+                    <span className="font-bold text-blue-600 uppercase tracking-tighter">{log.agent}</span>
+                    <span className="text-gray-400">{log.time}</span>
+                  </div>
+                  <div className="text-gray-700 leading-relaxed overflow-hidden whitespace-pre-wrap">
+                    {log.content}
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+            <div className="p-4 bg-black/5 text-[9px] text-gray-400 text-center">
+               HIERARCHICAL PROCESS ENABLED
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input Area */}

@@ -28,6 +28,55 @@ def format_history(history):
 def health_check():
     return "Medical Chatbot API is running correctly!"
 
+import json
+import threading
+import queue
+import sys
+
+class ThinkingCallback:
+    def __init__(self, q):
+        self.q = q
+    
+    def __call__(self, step):
+        try:
+            # Capture the agent's thought process
+            content = str(step)
+            agent_name = "Agent"
+
+            # CrewAI 1.0+ structures
+            if hasattr(step, 'thought') and step.thought:
+                content = step.thought
+            elif hasattr(step, 'log') and step.log:
+                content = step.log
+            
+            if hasattr(step, 'agent'):
+                agent_name = step.agent
+
+            log_entry = {
+                "type": "thinking",
+                "agent": agent_name,
+                "content": content
+            }
+            print(f">>> Log: {agent_name} is thinking...", file=sys.stdout, flush=True)
+            self.q.put(json.dumps(log_entry))
+        except Exception as e:
+            print(f"!!! Callback Error: {e}", file=sys.stdout, flush=True)
+
+class TaskCallback:
+    def __init__(self, q):
+        self.q = q
+        
+    def __call__(self, task_output):
+        try:
+            log_entry = {
+                "type": "thinking",
+                "agent": "System",
+                "content": f"Task Completed: {task_output.description[:100]}..."
+            }
+            self.q.put(json.dumps(log_entry))
+        except Exception:
+            pass
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -45,21 +94,49 @@ def chat():
             'user_profile': str(user_profile)
         }
         
-        crew = create_crew(inputs)
-        result = str(crew.kickoff(inputs=inputs))
+        q = queue.Queue()
+        callback = ThinkingCallback(q)
+        t_callback = TaskCallback(q)
+
+        def run_crew():
+            try:
+                print("DEBUG: Creating crew with callbacks", flush=True)
+                crew = create_crew(inputs, step_callback=callback)
+                # Task callbacks need to be assigned to each task
+                for task in crew.tasks:
+                    task.callback = t_callback
+
+                print("DEBUG: Kickoff starting...", flush=True)
+                result = str(crew.kickoff(inputs=inputs))
+                print(f"DEBUG: Kickoff finished. Result length: {len(result)}", flush=True)
+                # Send the final answer
+                answer_entry = {
+                    "type": "answer",
+                    "content": result
+                }
+                q.put(json.dumps(answer_entry))
+            except Exception as e:
+                q.put(json.dumps({"type": "error", "content": str(e)}))
+            finally:
+                q.put("[DONE]")
+
+        # Start crew in a background thread
+        print("DEBUG: Starting Crew thread...", flush=True)
+        threading.Thread(target=run_crew).start()
 
         def generate():
-            chunk_size = 5
-            for i in range(0, len(result), chunk_size):
-                yield f"data: {result[i:i+chunk_size]}\n\n"
-                time.sleep(0.01)
-            yield "data: [DONE]\n\n"
+            print("DEBUG: SSE generator started", flush=True)
+            while True:
+                item = q.get()
+                if item == "[DONE]":
+                    yield "data: [DONE]\n\n"
+                    break
+                yield f"data: {item}\n\n"
 
         return Response(generate(), mimetype='text/event-stream')
 
     except Exception as e:
         app.logger.error(f"Chat error: {str(e)}")
-        # FOR DEBUGGING ONLY: Return the actual error message
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 if __name__ == '__main__':

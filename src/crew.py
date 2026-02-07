@@ -3,7 +3,8 @@ from src.agents import MedicalAgents
 from src.tasks import MedicalTasks
 import os
 
-def create_crew(inputs):
+def create_crew(inputs, step_callback=None):
+    print(f"DEBUG: create_crew called with step_callback: {step_callback is not None}", flush=True)
     agents = MedicalAgents()
     tasks = MedicalTasks()
 
@@ -30,13 +31,22 @@ def create_crew(inputs):
     formatter = agents.format_specialist()
     f_task = tasks.formatting_task(formatter, d_task)
 
+    agents_list = [triage_specialist, researcher, consultant, formatter]
+    
+    # Enable step callbacks for real-time logging
+    if step_callback:
+        print("DEBUG: Registering step_callback to agents", flush=True)
+        for agent in agents_list:
+            agent.step_callback = step_callback
+
     # Crew Assembly
     crew = Crew(
-        agents=[triage_specialist, researcher, consultant, formatter],
+        agents=agents_list,
         tasks=[t_task, r_task, d_task, f_task],
         verbose=True,
         process=Process.hierarchical,
         manager_llm=agents.manager_llm,
+        step_callback=step_callback,
         memory=True,
         embedder={
             "provider": "google-generativeai",
